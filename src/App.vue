@@ -39,10 +39,8 @@ const checkMobile = () => {
 };
 
 const adjustPanelSizes = () => {
-  const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 + 24; // 24 magic number
+  const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 - 6; // 24 magic number
   editorTopHeight.value = isFileManagerVisible.value ? availableHeight * 0.7 : availableHeight;
-  
-  console.log(window.innerHeight, errorBarHeight , availableHeight);
 
   if (isFileManagerVisible.value && !isMobile.value) {
     editorHeight.value = editorTopHeight.value;
@@ -57,26 +55,26 @@ const startVerticalResize = (event) => {
   const startY = event.clientY;
   const startEditorTopHeight = editorTopHeight.value;
 
-const doResize = (e) => {
+  const doResize = (e) => {
     if (!isResizingVertical.value) return;
     
     const deltaY = e.clientY - startY;
     const newEditorTopHeight = startEditorTopHeight + deltaY;
-    const availableHeight = window.innerHeight - 64 - errorBarHeight - 30;
+    const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 + 24; // 25 magic number
 
     // VSCode-like auto-hide: 当拖拽到接近底部时自动隐藏文件管理器
-    const threshold = 150; // 距离底部150px时触发自动隐藏
-    if (isFileManagerVisible.value && newEditorTopHeight >= availableHeight - threshold) {
-      isFileManagerVisible.value = false;
-      editorTopHeight.value = availableHeight;
-      return;
-    }
+    // const threshold = 150; // 距离底部150px时触发自动隐藏
+    // if (isFileManagerVisible.value && newEditorTopHeight >= availableHeight - threshold) {
+    //   isFileManagerVisible.value = false;
+    //   editorTopHeight.value = availableHeight;
+    //   return;
+    // }
 
-    if (newEditorTopHeight >= 200 && newEditorTopHeight <= availableHeight - 100) {
+    if (newEditorTopHeight >= 200 && newEditorTopHeight <= availableHeight - 30) {
       editorTopHeight.value = newEditorTopHeight;
       if (isFileManagerVisible.value) {
         editorHeight.value = newEditorTopHeight;
-      }
+      } 
     }
   };
 
@@ -154,7 +152,7 @@ onMounted(() => {
       <!-- 底部区域 -->
       <div class="bottom-section" :class="{ mobile: isMobile }">
         <!-- 桌面模式的文件管理器内容 -->
-        <div v-if="!isMobile && isFileManagerVisible" class="file-manager-content">
+        <div v-if="!isMobile" class="file-manager-content">
           <!-- 状态栏 -->
           <div class="status-bar" :style="{ height: errorBarHeight + 'px' }">
             <div class="status-content">
