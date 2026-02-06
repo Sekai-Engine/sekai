@@ -39,9 +39,11 @@ const checkMobile = () => {
 };
 
 const adjustPanelSizes = () => {
-  const availableHeight = window.innerHeight - 64 - errorBarHeight - 30;
+  const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 + 24; // 24 magic number
   editorTopHeight.value = isFileManagerVisible.value ? availableHeight * 0.7 : availableHeight;
   
+  console.log(window.innerHeight, errorBarHeight , availableHeight);
+
   if (isFileManagerVisible.value && !isMobile.value) {
     editorHeight.value = editorTopHeight.value;
   }
