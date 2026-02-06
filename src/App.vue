@@ -39,7 +39,7 @@ const checkMobile = () => {
 };
 
 const adjustPanelSizes = () => {
-  const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 - 6; // 24 magic number
+  const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 - 6; // 6 magic number
   editorTopHeight.value = isFileManagerVisible.value ? availableHeight * 0.7 : availableHeight;
 
   if (isFileManagerVisible.value && !isMobile.value) {
@@ -60,7 +60,7 @@ const startVerticalResize = (event) => {
     
     const deltaY = e.clientY - startY;
     const newEditorTopHeight = startEditorTopHeight + deltaY;
-    const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 + 24; // 25 magic number
+    const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 + 24; // 24 magic number
 
     // VSCode-like auto-hide: 当拖拽到接近底部时自动隐藏文件管理器
     // const threshold = 150; // 距离底部150px时触发自动隐藏
@@ -74,7 +74,10 @@ const startVerticalResize = (event) => {
       editorTopHeight.value = newEditorTopHeight;
       if (isFileManagerVisible.value) {
         editorHeight.value = newEditorTopHeight;
-      } 
+        if (Math.floor(editorHeight.value) === 826) {
+          isFileManagerVisible.value = false;
+        }
+      }
     }
   };
 
