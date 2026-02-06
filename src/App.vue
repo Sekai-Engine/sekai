@@ -402,8 +402,9 @@ html, body {
 .bottom-section {
   display: flex;
   flex-direction: column;
-  flex: none;
+  flex: 1;
   border-top: 1px solid #dee2e6;
+  min-height: 0;
 }
 
 .bottom-section.mobile {
