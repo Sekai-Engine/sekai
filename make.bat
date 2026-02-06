@@ -23,6 +23,7 @@ if %errorlevel% neq 0 (
 
 echo ✅ 所有依赖已就绪。
 
+npm install
 npm run tauri build
 copy /y "src-tauri\target\release\sekai.exe" ".\" >nul 2>&1
 

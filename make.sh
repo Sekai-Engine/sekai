@@ -23,6 +23,7 @@ fi
 
 echo "✅ 所有依赖已就绪。"
 
+npm install
 npm run tauri build || true
 mv ./src-tauri/target/release/sekai .
 
