@@ -1,77 +1,136 @@
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { fileSystem } from '../services/FileSystem';
 
-const files = ref([
-  {
-    name: '场景设置',
-    type: 'folder',
-    expanded: true,
-    children: [
-      {
-        name: '背景音乐',
-        type: 'folder',
-        expanded: false,
-        children: [
-          { name: '开场音乐.mp3', type: 'file' },
-          { name: '高潮音乐.mp3', type: 'file' },
-          { name: '结局音乐.mp3', type: 'file' }
-        ]
-      },
-      {
-        name: '背景图片',
-        type: 'folder',
-        expanded: false,
-        children: [
-          { name: '城堡背景.jpg', type: 'file' },
-          { name: '森林场景.png', type: 'file' },
-          { name: '城市夜景.jpg', type: 'file' }
-        ]
-      },
-      {
-        name: '角色立绘',
-        type: 'folder',
-        expanded: false,
-        children: [
-          { name: '主角形象.png', type: 'file' },
-          { name: '反派形象.png', type: 'file' },
-          { name: '配角立绘.jpg', type: 'file' }
-        ]
-      }
-    ]
-  },
-  {
-    name: '剧本文件',
-    type: 'folder',
-    expanded: true,
-    children: [
-      { name: '第一章.txt', type: 'file' },
-      { name: '第二章.txt', type: 'file' },
-      { name: '对话记录.txt', type: 'file' }
-    ]
-  },
-  {
-    name: '特效素材',
-    type: 'folder',
-    expanded: false,
-    children: [
-      { name: '魔法效果.gif', type: 'file' },
-      { name: '转场动画.mp4', type: 'file' },
-      { name: '音效合集.zip', type: 'file' }
-    ]
-  }
-]);
-
+const route = useRoute();
+const files = ref([]);
 const selectedFile = ref(null);
 
-const toggleFolder = (folder) => {
+const loadProjectFiles = async () => {
+  const projectPath = route.query.path;
+  if (!projectPath) {
+    console.warn('No project path provided');
+    return;
+  }
+
+  try {
+    const entries = await fileSystem.readDir(projectPath);
+    
+    // Transform entries to our file structure
+    files.value = entries.map(entry => ({
+      name: entry.name,
+      type: entry.isDirectory ? 'folder' : 'file',
+      path: projectPath + (projectPath.endsWith('/') || projectPath.endsWith('\\') ? '' : '/') + entry.name, // Construct full path
+      expanded: false,
+      children: [] // Children will be loaded on expand
+    })).sort((a, b) => {
+      // Sort folders first
+      if (a.type === b.type) return a.name.localeCompare(b.name);
+      return a.type === 'folder' ? -1 : 1;
+    });
+  } catch (error) {
+    console.error('Failed to load project files:', error);
+  }
+};
+
+const createFolder = async () => {
+  const parentPath = selectedFile.value?.type === 'folder' 
+    ? selectedFile.value.path 
+    : (selectedFile.value && selectedFile.value.path ? selectedFile.value.path.split('/').slice(0, -1).join('/') : route.query.path);
+    
+  if (!parentPath) return;
+
+  const folderName = prompt('请输入文件夹名称:', 'New Folder');
+  if (!folderName) return;
+
+  try {
+    await fileSystem.createDirectory(await fileSystem.join(parentPath, folderName));
+    // Refresh parent folder or root
+    if (selectedFile.value?.type === 'folder') {
+      await loadFolderChildren(selectedFile.value);
+      selectedFile.value.expanded = true;
+    } else {
+      await loadProjectFiles();
+    }
+  } catch (error) {
+    console.error('Failed to create folder:', error);
+    alert('创建文件夹失败: ' + error.message);
+  }
+};
+
+const createFile = async () => {
+  const parentPath = selectedFile.value?.type === 'folder' 
+    ? selectedFile.value.path 
+    : (selectedFile.value && selectedFile.value.path ? selectedFile.value.path.split('/').slice(0, -1).join('/') : route.query.path);
+    
+  if (!parentPath) return;
+
+  const fileName = prompt('请输入文件名称 (包含后缀):', 'new_file.txt');
+  if (!fileName) return;
+
+  try {
+    await fileSystem.writeFile(await fileSystem.join(parentPath, fileName), '');
+    // Refresh parent folder or root
+    if (selectedFile.value?.type === 'folder') {
+      await loadFolderChildren(selectedFile.value);
+      selectedFile.value.expanded = true;
+    } else {
+      await loadProjectFiles();
+    }
+  } catch (error) {
+    console.error('Failed to create file:', error);
+    alert('创建文件失败: ' + error.message);
+  }
+};
+
+const importFile = () => {
+  alert('导入功能暂未实现');
+};
+
+const loadFolderChildren = async (folder) => {
+  if (!folder.path) return;
+  
+  try {
+    const entries = await fileSystem.readDir(folder.path);
+    folder.children = entries.map(entry => ({
+      name: entry.name,
+      type: entry.isDirectory ? 'folder' : 'file',
+      path: fileSystem.join(folder.path, entry.name),
+      expanded: false,
+      children: []
+    })).sort((a, b) => {
+      if (a.type === b.type) return a.name.localeCompare(b.name);
+      return a.type === 'folder' ? -1 : 1;
+    });
+  } catch (error) {
+    console.error(`Failed to load children for ${folder.name}:`, error);
+  }
+};
+
+const toggleFolder = async (folder) => {
+  if (!folder.expanded && (!folder.children || folder.children.length === 0)) {
+    // Load children on first expand
+    await loadFolderChildren(folder);
+  }
   folder.expanded = !folder.expanded;
 };
+
+const emit = defineEmits(['select-file']);
 
 const selectFile = (file) => {
   if (file.type === 'file') {
     selectedFile.value = file;
+    emit('select-file', file);
+  } else {
+    // Also update selectedFile for folder creation context
+    selectedFile.value = file;
   }
 };
+
+onMounted(() => {
+  loadProjectFiles();
+});
 
 const getFileIcon = (file) => {
   if (file.type === 'folder') {
@@ -118,6 +177,17 @@ const getFileColor = (file) => {
 
 <template>
   <div class="file-manager-container">
+    <div class="toolbar">
+      <button class="toolbar-btn" title="新建文件夹" @click="createFolder">
+        <span class="icon">📁+</span>
+      </button>
+      <button class="toolbar-btn" title="新建文件" @click="createFile">
+        <span class="icon">📄+</span>
+      </button>
+      <button class="toolbar-btn" title="导入文件" @click="importFile">
+        <span class="icon">📥</span>
+      </button>
+    </div>
     <div class="file-manager-body">
       <div class="file-tree">
         <div 
@@ -173,6 +243,36 @@ const getFileColor = (file) => {
   flex-direction: column;
   background: #ffffff;
   overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f1f3f5;
+  background-color: #f8f9fa;
+}
+
+.toolbar-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #495057;
+  font-size: 12px;
+}
+
+.toolbar-btn:hover {
+  background-color: #e9ecef;
+  border-color: #dee2e6;
+}
+
+.icon {
+  font-size: 14px;
 }
 
 .file-manager-body {

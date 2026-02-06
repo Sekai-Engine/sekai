@@ -4,15 +4,54 @@ import Editor from "../components/Editor.vue";
 import PreviewPanel from "../components/PreviewPanel.vue";
 import FileManager from "../components/FileManager.vue";
 import Settings from "../components/Settings.vue";
+import { fileSystem } from '../services/FileSystem';
 
 const message = ref("Sekai");
 const isFileManagerVisible = ref(true);
 const isMobile = ref(false);
 const editorHeight = ref(window.innerHeight * 0.6);
 const editorTopHeight = ref(window.innerHeight * 0.6);
-const errorBarHeight = 30;
+const errorBarHeight = ref(30); // Changed to ref to be reactive
+const isErrorPanelExpanded = ref(false); // New state for error panel
 const isResizingVertical = ref(false);
 const editorWidth = ref(isMobile.value ? 100 : 50);
+
+const currentFile = ref(null);
+const fileContent = ref('');
+
+const handleFileSelect = async (file) => {
+  currentFile.value = file;
+  try {
+    const content = await fileSystem.readFile(file.path);
+    fileContent.value = content;
+  } catch (error) {
+    console.error('Failed to read file:', error);
+    fileContent.value = 'Error reading file content';
+  }
+};
+
+const handleContentUpdate = async (newContent) => {
+  if (currentFile.value) {
+    try {
+      await fileSystem.writeFile(currentFile.value.path, newContent);
+      fileContent.value = newContent;
+    } catch (error) {
+      console.error('Failed to save file:', error);
+    }
+  }
+};
+
+const errors = ref([
+  // Mock data for testing
+  { type: 'error', message: 'Syntax error in script.json at line 15', time: '10:23:45' },
+  { type: 'warning', message: 'Unused variable "player_name"', time: '10:24:12' },
+  { type: 'info', message: 'Project saved successfully', time: '10:25:00' }
+]);
+
+const toggleErrorPanel = () => {
+  isErrorPanelExpanded.value = !isErrorPanelExpanded.value;
+  errorBarHeight.value = isErrorPanelExpanded.value ? 150 : 30;
+};
 
 const handleRun = () => {
   console.log("Running code...");
@@ -39,7 +78,7 @@ const checkMobile = () => {
 };
 
 const adjustPanelSizes = () => {
-  const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 - 6; // 6 magic number
+  const availableHeight = window.innerHeight - 64 - errorBarHeight.value - 30 - 6; // 6 magic number
   editorTopHeight.value = isFileManagerVisible.value ? availableHeight * 0.7 : availableHeight;
 
   if (isFileManagerVisible.value && !isMobile.value) {
@@ -60,7 +99,7 @@ const startVerticalResize = (event) => {
     
     const deltaY = e.clientY - startY;
     const newEditorTopHeight = startEditorTopHeight + deltaY;
-    const availableHeight = window.innerHeight - 64 - errorBarHeight - 30 + 24; // 24 magic number
+    const availableHeight = window.innerHeight - 64 - errorBarHeight.value - 30 + 24; // 24 magic number
 
     if (newEditorTopHeight >= 200 && newEditorTopHeight <= availableHeight - 30) {
       editorTopHeight.value = newEditorTopHeight;
@@ -118,7 +157,13 @@ onMounted(() => {
       <!-- 编辑器区域 -->
       <div class="editor-section" :style="{ height: editorTopHeight + 'px' }">
         <div class="editor-with-preview" :class="{ mobile: isMobile }">
-          <Editor v-if="!isMobile" :style="{ width: editorWidth + '%' }" />
+          <Editor 
+            v-if="!isMobile" 
+            :style="{ width: editorWidth + '%' }" 
+            :initial-content="fileContent"
+            :current-file="currentFile"
+            @update:content="handleContentUpdate"
+          />
           <Editor v-else />
           
           <!-- 水平拖动手柄 (仅桌面) -->
@@ -148,14 +193,35 @@ onMounted(() => {
       <div class="bottom-section" :class="{ mobile: isMobile }">
         <!-- 桌面模式的文件管理器内容 -->
         <div v-if="!isMobile" class="file-manager-content">
-          <!-- 状态栏 -->
-          <div class="status-bar" :style="{ height: errorBarHeight + 'px' }">
-            <div class="status-content">
-              <span class="status-icon">📝</span>
-              <span class="status-text"></span>
+          <!-- 状态栏 / 错误面板 -->
+          <div 
+            class="status-bar" 
+            :class="{ expanded: isErrorPanelExpanded }"
+            :style="{ height: errorBarHeight + 'px' }"
+            @click="toggleErrorPanel"
+          >
+            <div class="status-header">
+              <div class="status-title">
+                <span class="status-icon">⚠️</span>
+                <span class="status-text">
+                  {{ errors.length }} 个问题
+                </span>
+              </div>
+              <span class="toggle-icon">{{ isErrorPanelExpanded ? '▲' : '▼' }}</span>
+            </div>
+            
+            <!-- 错误列表内容 -->
+            <div v-if="isErrorPanelExpanded" class="error-list" @click.stop>
+              <div v-for="(error, index) in errors" :key="index" class="error-item" :class="error.type">
+                <span class="error-icon">
+                  {{ error.type === 'error' ? '❌' : error.type === 'warning' ? '⚠️' : 'ℹ️' }}
+                </span>
+                <span class="error-time">[{{ error.time }}]</span>
+                <span class="error-message">{{ error.message }}</span>
+              </div>
             </div>
           </div>
-          <FileManager />
+          <FileManager @select-file="handleFileSelect" />
           
           <!-- 文件管理器头部 (移到底部) -->
           <div class="file-manager-header" @click="toggleFileManager">
@@ -411,17 +477,28 @@ html, body {
   flex: 1;
 }
 
-/* 状态栏 */
+/* 状态栏 / 错误面板 */
 .status-bar {
   background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
   border-top: 1px solid #dee2e6;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   padding: 0 16px;
+  flex-shrink: 0;
+  transition: height 0.3s ease;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.status-header {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-shrink: 0;
 }
 
-.status-content {
+.status-title {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -436,6 +513,44 @@ html, body {
   color: #6c757d;
   font-family: 'Georgia', serif;
 }
+
+.toggle-icon {
+  font-size: 10px;
+  color: #6c757d;
+}
+
+.error-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  border-top: 1px solid #dee2e6;
+}
+
+.error-item {
+  padding: 4px 0;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px dashed #eee;
+  font-family: 'Consolas', monospace;
+}
+
+.error-item:last-child {
+  border-bottom: none;
+}
+
+.error-time {
+  color: #adb5bd;
+}
+
+.error-message {
+  color: #495057;
+}
+
+.error-item.error .error-message { color: #e03131; }
+.error-item.warning .error-message { color: #f08c00; }
+.error-item.info .error-message { color: #1c7ed6; }
 
 /* 文件管理器头部 */
 .file-manager-header {

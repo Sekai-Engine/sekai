@@ -1,8 +1,25 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, watch } from 'vue';
 
-const content = ref('');
+const props = defineProps({
+  initialContent: {
+    type: String,
+    default: ''
+  },
+  currentFile: {
+    type: Object,
+    default: null
+  }
+});
+
+const emit = defineEmits(['update:content']);
+
+const content = ref(props.initialContent);
 const textareaRef = ref(null);
+
+watch(() => props.initialContent, (newValue) => {
+  content.value = newValue;
+});
 
 const lineCount = computed(() => {
   if (!content.value) return 1;
@@ -10,7 +27,7 @@ const lineCount = computed(() => {
 });
 
 const updateContent = () => {
-  // Content is automatically updated via v-model
+  emit('update:content', content.value);
 };
 
 const syncScroll = (event) => {
@@ -40,15 +57,13 @@ const handleTab = (event) => {
   <div class="editor-container">
     <div class="editor-header">
       <div class="file-tabs">
-        <div class="tab active">
-          <span class="tab-name">第一幕</span>
+        <div v-if="currentFile" class="tab active">
+          <span class="tab-name">{{ currentFile.name }}</span>
           <span class="tab-close">×</span>
         </div>
-        <div class="tab">
-          <span class="tab-name">第二幕</span>
-          <span class="tab-close">×</span>
+        <div v-else class="tab active">
+          <span class="tab-name">Untitled</span>
         </div>
-        <div class="add-tab">+</div>
       </div>
       <div class="editor-actions">
         <button class="action-button">📋</button>

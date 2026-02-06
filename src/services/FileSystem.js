@@ -6,8 +6,72 @@ export class IFileSystem {
   async getAppInstallDir() { throw new Error('Not implemented'); }
   async createDirectory(path) { throw new Error('Not implemented'); }
   async writeFile(path, content) { throw new Error('Not implemented'); }
-  async readFile(path) { throw new Error('Not implemented'); }
+  async readFile(path) {
+    // If it's an OPFS path
+    if (path.startsWith('opfs:/')) {
+      // Split path to separate filename
+      const relativePath = path.replace('opfs:/', '');
+      const parts = relativePath.split('/').filter(p => p);
+      const fileName = parts.pop();
+      const dirPath = 'opfs:/' + parts.join('/');
+
+      // Get parent directory handle (OPFS)
+      const dirHandle = await this._getHandle(dirPath, false);
+      
+      // Get file handle
+      const fileHandle = await dirHandle.getFileHandle(fileName);
+      
+      // Get file and read text
+      const file = await fileHandle.getFile();
+      return await file.text();
+    }
+
+    if (!this.rootHandle) throw new Error('No directory selected');
+
+    // Split path to separate filename
+    const parts = path.split('/').filter(p => p);
+    const fileName = parts.pop();
+    const dirPath = '/' + parts.join('/');
+
+    // Get parent directory handle
+    const dirHandle = await this._getHandle(dirPath, false);
+    
+    // Get file handle
+    const fileHandle = await dirHandle.getFileHandle(fileName);
+    
+    // Get file and read text
+    const file = await fileHandle.getFile();
+    return await file.text();
+  }
+
+  async readDir(path) {
+    const entries = [];
+    let dirHandle;
+
+    // Handle OPFS paths
+    if (path.startsWith('opfs:/')) {
+      dirHandle = await this._getHandle(path, false);
+    } else {
+      // Handle user selected directory
+      if (!this.rootHandle) throw new Error('No directory selected');
+      dirHandle = await this._getHandle(path, false);
+    }
+
+    // In File System Access API, we iterate over values() or entries()
+    // For directory handle, .values() gives us handles directly
+    for await (const entry of dirHandle.values()) {
+      entries.push({
+        name: entry.name,
+        // In File System Access API, kind is 'directory' or 'file'
+        isDirectory: entry.kind === 'directory', 
+        isFile: entry.kind === 'file',
+      });
+    }
+    return entries;
+  }
+
   async join(...paths) { throw new Error('Not implemented'); }
+  async exists(path) { throw new Error('Not implemented'); }
 }
 
 // Tauri Implementation
@@ -56,9 +120,19 @@ class TauriFileSystem extends IFileSystem {
     return await this.fs.writeTextFile(path, content);
   }
 
+  async readDir(path) {
+    await this.init();
+    return await this.fs.readDir(path);
+  }
+
   async join(...paths) {
     await this.init();
     return await this.path.join(...paths);
+  }
+
+  async exists(path) {
+    await this.init();
+    return await this.fs.exists(path);
   }
 }
 
@@ -72,17 +146,22 @@ class WebFileSystem extends IFileSystem {
     this.rootName = '';
   }
 
+  async init() {
+    // No initialization needed for WebFileSystem
+    return Promise.resolve();
+  }
+
   async selectDirectory() {
     try {
       // 1. Show picker to user
       this.rootHandle = await window.showDirectoryPicker();
       this.rootName = this.rootHandle.name;
-      
+
       // 2. Cache the root handle
       // We use a virtual path prefix to identify this mount point
       const virtualPath = `/${this.rootName}`;
       this.handles.set(virtualPath, this.rootHandle);
-      
+
       return virtualPath;
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -115,9 +194,9 @@ class WebFileSystem extends IFileSystem {
       // Remove prefix and split
       const relativePath = path.replace('opfs:/', '');
       if (!relativePath) return currentHandle; // Root
-      
+
       const parts = relativePath.split('/').filter(p => p);
-      
+
       for (let i = 0; i < parts.length; i++) {
         const name = parts[i];
         // If it's the last part and we are just resolving (not creating file yet), 
@@ -130,7 +209,7 @@ class WebFileSystem extends IFileSystem {
 
     // Normalize path
     const parts = path.split('/').filter(p => p);
-    
+
     // Check if path starts with our root name
     if (parts[0] !== this.rootName) {
       throw new Error(`Path must start with selected root: ${this.rootName}`);
@@ -167,7 +246,7 @@ class WebFileSystem extends IFileSystem {
     }
 
     if (!this.rootHandle) throw new Error('No directory selected');
-    
+
     // _getHandle traverses and creates directories if create=true
     await this._getHandle(path, true);
     return path;
@@ -184,10 +263,10 @@ class WebFileSystem extends IFileSystem {
 
       // Get parent directory handle (OPFS)
       const dirHandle = await this._getHandle(dirPath, true);
-      
+
       // Create/Get file
       const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-      
+
       // Write content
       const writable = await fileHandle.createWritable();
       await writable.write(content);
@@ -204,10 +283,10 @@ class WebFileSystem extends IFileSystem {
 
     // Get parent directory handle
     const dirHandle = await this._getHandle(dirPath, true);
-    
+
     // Create/Get file
     const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-    
+
     // Write content
     const writable = await fileHandle.createWritable();
     await writable.write(content);
@@ -218,13 +297,28 @@ class WebFileSystem extends IFileSystem {
     // Simple path join for web
     // Ensure we don't duplicate slashes and handle root correctly
     const joined = paths.join('/').replace(/\/+/g, '/');
-    
+
     // Preserve opfs:/ prefix if present
     if (paths[0].startsWith('opfs:/')) {
-        return joined.replace('opfs://', 'opfs:/');
+      return joined.replace('opfs://', 'opfs:/');
     }
 
     return joined.startsWith('/') ? joined : '/' + joined;
+  }
+
+  async exists(path) {
+    try {
+      if (path.startsWith('opfs:/')) {
+        await this._getHandle(path, false);
+        return true;
+      }
+
+      if (!this.rootHandle) return false;
+      await this._getHandle(path, false);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }
 

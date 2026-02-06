@@ -20,7 +20,20 @@ const createNewProject = async () => {
   try {
     // Both Desktop and Web now use "App Install Directory" (Resource Dir or OPFS)
     // This provides a fixed path without prompting user every time
-    const baseDir = await fileSystem.getAppInstallDir();
+    let baseDir = await fileSystem.getAppInstallDir();
+
+    // Fallback for Web if getAppInstallDir (OPFS) is not desired or fails silently
+    // Or if we want to allow user to pick a folder on first time if not using OPFS
+    // But currently getAppInstallDir returns "opfs:/" on web.
+    
+    // In Web, if user hasn't selected a directory yet (and we want to support external folders too),
+    // we might need to prompt. But our current logic for Web uses OPFS by default.
+    // If the error "No project path provided" appears, it might be because baseDir is null/undefined.
+    
+    if (!baseDir) {
+       // If getting default dir fails, ask user to pick
+       baseDir = await fileSystem.selectDirectory();
+    }
 
     if (baseDir) {
       // Prompt user for project name
@@ -57,6 +70,7 @@ const createNewProject = async () => {
       projects.value.unshift({
         id: Date.now(),
         name: projectName,
+        path: projectPath, // Save path
         description: config.description,
         image: '/placeholder-game.jpg',
         lastModified: new Date().toLocaleDateString()
@@ -70,8 +84,11 @@ const createNewProject = async () => {
   }
 };
 
-const openProject = (id) => {
-  router.push('/editor');
+const openProject = (project) => {
+  router.push({
+    path: '/editor',
+    query: { path: project.path, name: project.name }
+  });
 };
 
 const deleteProject = (id) => {
@@ -137,7 +154,7 @@ const editProject = (id) => {
             <h3>{{ project.name }}</h3>
             <p class="description">{{ project.description }}</p>
             <div class="card-actions">
-              <button class="btn-primary btn-block" @click="openProject(project.id)">
+              <button class="btn-primary btn-block" @click="openProject(project)">
                 编辑游戏
               </button>
               <div class="dropdown-menu-container">
