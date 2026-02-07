@@ -15,9 +15,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-where wget >nul 2>&1
+where curl >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ 未找到 wget。请安装 wget。
+    echo ❌ 未找到 curl。
     exit /b 1
 )
 
