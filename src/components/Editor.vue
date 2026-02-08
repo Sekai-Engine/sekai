@@ -246,20 +246,15 @@ const handleTab = (event) => {
 }
 
 .line-number {
-  height: 24px;
+  height: 27px; /* Matches line-height 1.7 * 16px font-size ≈ 27.2px */
   display: flex;
   align-items: center;
   justify-content: flex-end;
   color: #adb5bd;
   font-family: 'Georgia', serif;
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 14px; /* Line numbers usually smaller */
   padding-right: 12px;
   transition: color 0.2s ease;
-}
-
-.line-number:hover {
-  color: #495057;
 }
 
 .text-input {
@@ -271,7 +266,7 @@ const handleTab = (event) => {
   resize: none;
   font-family: 'Georgia', serif;
   font-size: 16px;
-  line-height: 1.7;
+  line-height: 27px; /* Explicit line-height in px to match line numbers */
   color: #2d3436;
   overflow-y: auto;
   caret-color: #4361ee;
