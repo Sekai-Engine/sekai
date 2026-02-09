@@ -106,6 +106,13 @@ const handleCloseFile = (file) => {
   }
 };
 
+const handleFileDeleted = (deletedFile) => {
+  const file = openedFiles.value.find(f => f.path === deletedFile.path);
+  if (file) {
+    file.isDirty = true;
+  }
+};
+
 const handleContentUpdate = async (newContent) => {
   if (currentFile.value) {
     if (currentFile.value.isUnsaved) {
@@ -396,7 +403,7 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          <FileManager @select-file="handleFileSelect" />
+          <FileManager @select-file="handleFileSelect" @file-deleted="handleFileDeleted" />
           
           <!-- 文件管理器头部 (移到底部) -->
           <div class="file-manager-header" @click="toggleFileManager">
@@ -422,7 +429,7 @@ onMounted(() => {
         <!-- 手机模式的额外内容 -->
         <template v-if="isMobile">
           <PreviewPanel class="mobile-preview" />
-          <FileManager class="mobile-file-manager" />
+          <FileManager class="mobile-file-manager" @file-deleted="handleFileDeleted" />
         </template>
       </div>
     </main>

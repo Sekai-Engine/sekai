@@ -23,11 +23,16 @@ const handleContextMenu = (e, file) => {
     y: e.clientY,
     file: file
   };
-  // Select the file as well
-  if (file.type === 'file') {
-    selectedFile.value = file;
+  
+  if (file) {
+    // Select the file as well
+    if (file.type === 'file') {
+      selectedFile.value = file;
+    } else {
+      selectedFile.value = file; // Also select folder for context
+    }
   } else {
-    selectedFile.value = file; // Also select folder for context
+    selectedFile.value = null;
   }
 };
 
@@ -59,6 +64,7 @@ const deleteFile = async () => {
   
   try {
     await fileSystem.remove(file.path);
+    emit('file-deleted', file);
     // Refresh will happen via watcher
   } catch (error) {
     console.error('Failed to delete file:', error);
@@ -228,7 +234,7 @@ const toggleFolder = async (folder) => {
   folder.expanded = !folder.expanded;
 };
 
-const emit = defineEmits(['select-file']);
+const emit = defineEmits(['select-file', 'file-deleted']);
 
 const selectFile = (file) => {
   if (file.type === 'file') {
@@ -289,25 +295,14 @@ const getFileColor = (file) => {
 
 <template>
   <div class="file-manager-container">
-    <div class="toolbar">
-      <button class="toolbar-btn" title="新建文件夹" @click="createFolder">
-        <span class="icon">📁+</span>
-      </button>
-      <button class="toolbar-btn" title="新建文件" @click="createFile">
-        <span class="icon">📄+</span>
-      </button>
-      <button class="toolbar-btn" title="导入文件" @click="importFile">
-        <span class="icon">📥</span>
-      </button>
-    </div>
-    <div class="file-manager-body">
+    <div class="file-manager-body" @contextmenu.prevent="handleContextMenu($event, null)">
       <div class="file-tree">
         <div 
           v-for="file in files" 
           :key="file.name"
           class="file-item"
           @click="file.type === 'folder' ? toggleFolder(file) : selectFile(file)"
-          @contextmenu="handleContextMenu($event, file)"
+          @contextmenu.stop="handleContextMenu($event, file)"
         >
           <div 
             class="file-content"
@@ -354,7 +349,16 @@ const getFileColor = (file) => {
       class="context-menu"
       :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
     >
-      <div class="menu-item delete" @click="deleteFile">
+      <div class="menu-item" @click="createFolder">
+        <span class="menu-icon">📁</span>
+        新建文件夹
+      </div>
+      <div class="menu-item" @click="createFile">
+        <span class="menu-icon">📄</span>
+        新建文件
+      </div>
+      <div class="menu-separator" v-if="contextMenu.file"></div>
+      <div class="menu-item delete" @click="deleteFile" v-if="contextMenu.file">
         <span class="menu-icon">🗑️</span>
         删除
       </div>
@@ -371,7 +375,13 @@ const getFileColor = (file) => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 4px 0;
   z-index: 1000;
-  min-width: 120px;
+  min-width: 140px;
+}
+
+.menu-separator {
+  height: 1px;
+  background-color: #e9ecef;
+  margin: 4px 0;
 }
 
 .menu-item {
