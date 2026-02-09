@@ -29,7 +29,13 @@ const createNewProject = async () => {
       
       if (!projectName) return; // User cancelled prompt
 
-      const projectPath = await fileSystem.join(baseDir, projectName);
+      // Ensure 'projects' directory exists
+      const projectsDir = await fileSystem.join(baseDir, 'projects');
+      if (!await fileSystem.exists(projectsDir)) {
+          await fileSystem.createDirectory(projectsDir);
+      }
+
+      const projectPath = await fileSystem.join(projectsDir, projectName);
 
       // Check if directory already exists to prevent overwriting (basic check)
       // Note: FileSystem.js createDirectory implementation might throw or handle this

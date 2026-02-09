@@ -27,19 +27,62 @@ const handleFileSelect = async (file) => {
   const existingFile = openedFiles.value.find(f => f.path === file.path);
   if (!existingFile) {
     openedFiles.value.push(file);
+  } else {
+    // If switching to an existing dirty file, use its in-memory content
+    if (existingFile.isDirty && existingFile.content !== undefined) {
+      currentFile.value = existingFile;
+      fileContent.value = existingFile.content;
+      return;
+    }
+    // Update reference to the existing file object in openedFiles to ensure state consistency
+    file = existingFile;
   }
   
   currentFile.value = file;
+
+  // If it's a new unsaved file, content is already in memory
+  if (file.isUnsaved) {
+    fileContent.value = file.content || '';
+    return;
+  }
+
   try {
+    // Basic binary check by extension
+    const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'webp', 'mp3', 'wav', 'ogg', 'mp4', 'webm', 'exe', 'dll', 'so', 'dylib', 'bin', 'obj', 'fbx', 'gltf', 'glb', 'pdf', 'zip', 'tar', 'gz', '7z', 'rar'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    
+    if (binaryExtensions.includes(ext)) {
+      fileContent.value = `[Binary file: ${file.name}]\n(Preview not supported)`;
+      return;
+    }
+
+    // Check file size (optional, requires fs.stat which we don't have exposed yet in simple wrapper)
+    // For now we just read. If it fails or is huge, we catch error.
+    
     const content = await fileSystem.readFile(file.path);
+    
+    // Simple heuristic check for binary content if extension check passed
+    // (e.g. looking for null bytes in first few chars)
+    if (content.includes('\0')) {
+       fileContent.value = `[Binary file detected]\n(Content contains null bytes)`;
+       return;
+    }
+
     fileContent.value = content;
+    file.originalContent = content; // Store original content for dirty check
+    file.isDirty = false;
   } catch (error) {
     console.error('Failed to read file:', error);
-    fileContent.value = 'Error reading file content';
+    fileContent.value = `Error reading file: ${error.message}`;
   }
 };
 
 const handleSwitchFile = async (file) => {
+  // Save current file content to memory before switching
+  if (currentFile.value) {
+     currentFile.value.content = fileContent.value;
+  }
+  
   if (currentFile.value && currentFile.value.path === file.path) return;
   await handleFileSelect(file);
 };
@@ -65,66 +108,108 @@ const handleCloseFile = (file) => {
 
 const handleContentUpdate = async (newContent) => {
   if (currentFile.value) {
-    try {
-      await fileSystem.writeFile(currentFile.value.path, newContent);
+    if (currentFile.value.isUnsaved) {
+       fileContent.value = newContent;
+       currentFile.value.content = newContent;
+    } else {
+      // Mark as dirty instead of auto-saving immediately
+      if (newContent !== currentFile.value.originalContent) {
+        currentFile.value.isDirty = true;
+      } else {
+        currentFile.value.isDirty = false;
+      }
+      
+      // Update in openedFiles list to reflect dirty state
+      const index = openedFiles.value.findIndex(f => f.path === currentFile.value.path);
+      if (index !== -1) {
+         openedFiles.value[index].isDirty = currentFile.value.isDirty;
+      }
+      
       fileContent.value = newContent;
+    }
+  }
+};
+
+const handleCreateFile = async () => {
+  // Create a new in-memory file
+  const newFile = {
+    name: 'Untitled',
+    path: null, // No path yet
+    type: 'file',
+    isUnsaved: true,
+    content: '',
+    isDirty: true // New unsaved files are dirty by default
+  };
+  
+  await handleFileSelect(newFile);
+};
+
+const saveCurrentFile = async () => {
+  if (!currentFile.value) return;
+
+  if (currentFile.value.isUnsaved) {
+    // ... existing save logic for new file
+    const fileName = prompt('请输入保存的文件名 (包含后缀):', 'new_file.txt');
+    if (!fileName) return;
+
+    let parentPath = null;
+    const route = router.currentRoute.value;
+    parentPath = route.query.path;
+    
+    if (!parentPath) {
+       alert("无法确定保存位置");
+       return;
+    }
+
+    try {
+      const newFilePath = await fileSystem.join(parentPath, fileName);
+      await fileSystem.writeFile(newFilePath, currentFile.value.content || '');
+      
+      currentFile.value.name = fileName;
+      currentFile.value.path = newFilePath;
+      currentFile.value.isUnsaved = false;
+      currentFile.value.isDirty = false; // Clear dirty flag
+      currentFile.value.originalContent = currentFile.value.content; // Update original content baseline
+      delete currentFile.value.content;
+      
+      const index = openedFiles.value.indexOf(currentFile.value);
+      if (index !== -1) {
+         openedFiles.value[index] = { ...currentFile.value };
+      }
+      
+      // alert('保存成功'); // Removed alert
+    } catch (error) {
+      console.error('Failed to save file:', error);
+      alert('保存失败: ' + error.message);
+    }
+  } else {
+    try {
+      await fileSystem.writeFile(currentFile.value.path, fileContent.value);
+      currentFile.value.isDirty = false;
+      currentFile.value.originalContent = fileContent.value;
+      
+      const index = openedFiles.value.findIndex(f => f.path === currentFile.value.path);
+      if (index !== -1) {
+         openedFiles.value[index].isDirty = false;
+      }
+      
+      // alert('保存成功'); // Removed alert
     } catch (error) {
       console.error('Failed to save file:', error);
     }
   }
 };
 
-const handleCreateFile = async () => {
-  const fileName = prompt('请输入新文件名称 (包含后缀):', 'untitled.txt');
-  if (!fileName) return;
-
-  // Ideally we need a path. 
-  // If a file is currently open, create in same dir.
-  // If not, maybe ask user or default to root?
-  // But wait, the user is in Editor, context is usually the current file's folder.
-  
-  // Let's get the base path from currentFile or route query
-  let parentPath = null;
-  
-  if (currentFile.value && currentFile.value.path) {
-     // Get parent directory of current file
-     // Windows path separator is \, but web/tauri might normalize to /
-     // Let's assume / for now as we use join()
-     const parts = currentFile.value.path.split(/[\/\\]/);
-     parts.pop();
-     parentPath = parts.join('/');
-  } else {
-     // Fallback to project root from route
-     const route = router.currentRoute.value;
-     parentPath = route.query.path;
-  }
-
-  if (!parentPath) {
-      alert("无法确定创建位置，请先在文件管理器中选择一个项目");
-      return;
-  }
-
-  try {
-    const newFilePath = await fileSystem.join(parentPath, fileName);
-    await fileSystem.writeFile(newFilePath, '');
-    
-    // Open the new file
-    // We need to construct a file object similar to what FileManager emits
-    const newFile = {
-        name: fileName,
-        path: newFilePath,
-        type: 'file'
-    };
-    await handleFileSelect(newFile);
-    
-    // Also we might want to refresh file manager, but EditorView doesn't easily control FileManager's internal state
-    // For now, the file is created and opened. FileManager needs a refresh mechanism or we just leave it be until user interacts.
-    
-  } catch (error) {
-    console.error('Failed to create file:', error);
-    alert('创建文件失败: ' + error.message);
-  }
-};
+// Add keyboard listener for Ctrl+S
+onMounted(() => {
+  // ... existing onMounted code
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveCurrentFile();
+    }
+  });
+});
 
 
 const errors = ref([

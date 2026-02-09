@@ -1,5 +1,5 @@
 // File System Service (Tauri only)
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, confirm } from '@tauri-apps/plugin-dialog';
 import * as fs from '@tauri-apps/plugin-fs';
 import * as path from '@tauri-apps/api/path';
 
@@ -12,6 +12,10 @@ class TauriFileSystem {
     });
   }
 
+  async confirm(message, title = 'Confirm') {
+    return await confirm(message, { title, kind: 'warning' });
+  }
+
   async getDocumentDir() {
     return await path.documentDir();
   }
@@ -22,6 +26,28 @@ class TauriFileSystem {
 
   async createDirectory(dirPath) {
     return await fs.mkdir(dirPath);
+  }
+
+  async remove(path) {
+    // Determine if it's a file or directory first to use correct removal method?
+    // fs.remove removes file, fs.removeDir removes directory.
+    // Or we can try remove and see.
+    // Tauri v2 fs plugin has separate functions usually?
+    // Let's check docs or try. 
+    // fs.remove is for files. fs.removeDir is for directories.
+    
+    // Check if it is directory
+    const isDir = await this.exists(path) && (await fs.stat(path)).isDirectory;
+    
+    if (isDir) {
+        return await fs.remove(path, { recursive: true }); // v2 fs.remove handles both if recursive? 
+        // Actually in v2 plugin-fs:
+        // remove(path: string, options?: RemoveOptions): Promise<void>
+        // options: { recursive?: boolean }
+        // So fs.remove with recursive true should handle both.
+    } else {
+        return await fs.remove(path);
+    }
   }
 
   async writeFile(filePath, content) {

@@ -71,12 +71,11 @@ const handleTab = (event) => {
           class="tab" 
           :class="{ active: currentFile && currentFile.path === file.path }"
           @click="$emit('switch-file', file)"
+          @auxclick.prevent="$emit('close-file', file)"
         >
           <span class="tab-name">{{ file.name }}</span>
+          <span v-if="file.isDirty" class="tab-dirty">*</span>
           <span class="tab-close" @click.stop="$emit('close-file', file)">×</span>
-        </div>
-        <div v-if="openedFiles.length === 0" class="tab active">
-          <span class="tab-name">Untitled</span>
         </div>
         <div class="add-tab" @click="handleAddTab" title="New File">+</div>
       </div>
@@ -85,7 +84,7 @@ const handleTab = (event) => {
       </div>
     </div>
     
-    <div class="editor-body">
+    <div class="editor-body" v-if="currentFile">
       <div class="line-numbers">
         <div
           v-for="lineNumber in lineCount"
@@ -106,10 +105,69 @@ const handleTab = (event) => {
         spellcheck="false"
       ></textarea>
     </div>
+    
+    <div class="editor-empty-state" v-else>
+      <div class="empty-content">
+        <div class="empty-icon">📝</div>
+        <h3>No Open Files</h3>
+        <p>Select a file from the sidebar or create a new one</p>
+        <button class="create-btn" @click="handleAddTab">Create New File</button>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.editor-empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  color: #adb5bd;
+}
+
+.empty-content {
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-content h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: #495057;
+  font-weight: 500;
+  font-family: 'Georgia', serif;
+}
+
+.empty-content p {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.create-btn {
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  color: #495057;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  font-family: 'Georgia', serif;
+}
+
+.create-btn:hover {
+  border-color: #adb5bd;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
 .editor-container {
   height: 100%;
   display: flex;
@@ -169,6 +227,13 @@ const handleTab = (event) => {
   font-weight: 400;
   font-family: 'Georgia', serif;
   color: #495057;
+}
+
+.tab-dirty {
+  font-size: 14px;
+  color: #adb5bd;
+  margin-left: 2px;
+  font-weight: bold;
 }
 
 .tab.active .tab-name {

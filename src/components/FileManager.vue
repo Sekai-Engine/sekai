@@ -8,6 +8,64 @@ const files = ref([]);
 const selectedFile = ref(null);
 let unwatch = null;
 
+const contextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  file: null
+});
+
+const handleContextMenu = (e, file) => {
+  e.preventDefault();
+  contextMenu.value = {
+    visible: true,
+    x: e.clientX,
+    y: e.clientY,
+    file: file
+  };
+  // Select the file as well
+  if (file.type === 'file') {
+    selectedFile.value = file;
+  } else {
+    selectedFile.value = file; // Also select folder for context
+  }
+};
+
+const closeContextMenu = () => {
+  contextMenu.value.visible = false;
+};
+
+// Close context menu on click outside
+onMounted(() => {
+  document.addEventListener('click', closeContextMenu);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu);
+  if (unwatch) {
+    unwatch();
+    unwatch = null;
+  }
+});
+
+const deleteFile = async () => {
+  const file = contextMenu.value.file;
+  if (!file) return;
+  
+  // Use Tauri native confirm dialog
+  const confirmed = await fileSystem.confirm(`确定要删除 ${file.name} 吗?`, '删除确认');
+
+  if (!confirmed) return;
+  
+  try {
+    await fileSystem.remove(file.path);
+    // Refresh will happen via watcher
+  } catch (error) {
+    console.error('Failed to delete file:', error);
+    alert('删除失败: ' + error.message);
+  }
+};
+
 const mergeFiles = (currentFiles, newEntries) => {
   // Helper to find file in array
   const findFile = (arr, name) => arr.find(f => f.name === name);
@@ -249,6 +307,7 @@ const getFileColor = (file) => {
           :key="file.name"
           class="file-item"
           @click="file.type === 'folder' ? toggleFolder(file) : selectFile(file)"
+          @contextmenu="handleContextMenu($event, file)"
         >
           <div 
             class="file-content"
@@ -269,6 +328,7 @@ const getFileColor = (file) => {
               :key="child.name"
               class="file-item"
               @click.stop="child.type === 'folder' ? toggleFolder(child) : selectFile(child)"
+              @contextmenu.stop="handleContextMenu($event, child)"
               :style="{ marginLeft: '20px' }"
             >
               <div 
@@ -287,10 +347,60 @@ const getFileColor = (file) => {
         </div>
       </div>
     </div>
+    
+    <!-- Context Menu -->
+    <div 
+      v-if="contextMenu.visible" 
+      class="context-menu"
+      :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
+    >
+      <div class="menu-item delete" @click="deleteFile">
+        <span class="menu-icon">🗑️</span>
+        删除
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.context-menu {
+  position: fixed;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 1000;
+  min-width: 120px;
+}
+
+.menu-item {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #495057;
+  font-family: 'Georgia', serif;
+}
+
+.menu-item:hover {
+  background-color: #f8f9fa;
+}
+
+.menu-item.delete {
+  color: #e03131;
+}
+
+.menu-item.delete:hover {
+  background-color: #fff5f5;
+}
+
+.menu-icon {
+  font-size: 14px;
+}
+
 .file-manager-container {
   height: 100%;
   display: flex;
