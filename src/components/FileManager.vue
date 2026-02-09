@@ -1,11 +1,49 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { fileSystem } from '../services/FileSystem';
 
 const route = useRoute();
 const files = ref([]);
 const selectedFile = ref(null);
+let unwatch = null;
+
+const mergeFiles = (currentFiles, newEntries) => {
+  // Helper to find file in array
+  const findFile = (arr, name) => arr.find(f => f.name === name);
+
+  // Map new entries to preserve state
+  return newEntries.map(entry => {
+    const existing = findFile(currentFiles, entry.name);
+    
+    // Create base object
+    const newFile = {
+      name: entry.name,
+      type: entry.isDirectory ? 'folder' : 'file',
+      path: route.query.path + (route.query.path.endsWith('/') || route.query.path.endsWith('\\') ? '' : '/') + entry.name,
+      expanded: false,
+      children: []
+    };
+
+    // Restore state if exists
+    if (existing) {
+      newFile.expanded = existing.expanded;
+      if (existing.children && existing.children.length > 0) {
+        // If we had children, we keep them. 
+        // Ideally we should recursively merge/watch subfolders too, 
+        // but for root watch, we might just keep existing loaded children 
+        // or clear them if we want fresh state. 
+        // For now, let's keep them to avoid collapse.
+        newFile.children = existing.children;
+      }
+    }
+    
+    return newFile;
+  }).sort((a, b) => {
+    if (a.type === b.type) return a.name.localeCompare(b.name);
+    return a.type === 'folder' ? -1 : 1;
+  });
+};
 
 const loadProjectFiles = async () => {
   const projectPath = route.query.path;
@@ -14,9 +52,18 @@ const loadProjectFiles = async () => {
     return;
   }
 
+  // Start watching if not already
+  if (!unwatch) {
+    unwatch = fileSystem.watch(projectPath, (entries) => {
+      // Update files preserving state
+      files.value = mergeFiles(files.value, entries);
+    });
+  }
+
   try {
     const entries = await fileSystem.readDir(projectPath);
     
+    // Initial load - also use merge to be consistent or just map
     // Transform entries to our file structure
     files.value = entries.map(entry => ({
       name: entry.name,
@@ -33,6 +80,13 @@ const loadProjectFiles = async () => {
     console.error('Failed to load project files:', error);
   }
 };
+
+onUnmounted(() => {
+  if (unwatch) {
+    unwatch();
+    unwatch = null;
+  }
+});
 
 const createFolder = async () => {
   const parentPath = selectedFile.value?.type === 'folder' 
