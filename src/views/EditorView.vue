@@ -20,8 +20,15 @@ const editorWidth = ref(isMobile.value ? 100 : 50);
 
 const currentFile = ref(null);
 const fileContent = ref('');
+const openedFiles = ref([]); // Manage list of opened files
 
 const handleFileSelect = async (file) => {
+  // Check if file is already opened
+  const existingFile = openedFiles.value.find(f => f.path === file.path);
+  if (!existingFile) {
+    openedFiles.value.push(file);
+  }
+  
   currentFile.value = file;
   try {
     const content = await fileSystem.readFile(file.path);
@@ -29,6 +36,30 @@ const handleFileSelect = async (file) => {
   } catch (error) {
     console.error('Failed to read file:', error);
     fileContent.value = 'Error reading file content';
+  }
+};
+
+const handleSwitchFile = async (file) => {
+  if (currentFile.value && currentFile.value.path === file.path) return;
+  await handleFileSelect(file);
+};
+
+const handleCloseFile = (file) => {
+  const index = openedFiles.value.findIndex(f => f.path === file.path);
+  if (index !== -1) {
+    openedFiles.value.splice(index, 1);
+    
+    // If closed file was active, switch to another one
+    if (currentFile.value && currentFile.value.path === file.path) {
+      if (openedFiles.value.length > 0) {
+        // Switch to the previous one or the first one
+        const newFile = openedFiles.value[Math.max(0, index - 1)];
+        handleSwitchFile(newFile);
+      } else {
+        currentFile.value = null;
+        fileContent.value = '';
+      }
+    }
   }
 };
 
@@ -217,8 +248,11 @@ onMounted(() => {
             :style="{ width: editorWidth + '%' }" 
             :initial-content="fileContent"
             :current-file="currentFile"
+            :opened-files="openedFiles"
             @update:content="handleContentUpdate"
             @create-file="handleCreateFile"
+            @switch-file="handleSwitchFile"
+            @close-file="handleCloseFile"
           />
           <Editor v-else />
           

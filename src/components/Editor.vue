@@ -9,10 +9,14 @@ const props = defineProps({
   currentFile: {
     type: Object,
     default: null
+  },
+  openedFiles: {
+    type: Array,
+    default: () => []
   }
 });
 
-const emit = defineEmits(['update:content', 'create-file']);
+const emit = defineEmits(['update:content', 'create-file', 'switch-file', 'close-file']);
 
 const content = ref(props.initialContent);
 const textareaRef = ref(null);
@@ -61,11 +65,17 @@ const handleTab = (event) => {
   <div class="editor-container">
     <div class="editor-header">
       <div class="file-tabs">
-        <div v-if="currentFile" class="tab active">
-          <span class="tab-name">{{ currentFile.name }}</span>
-          <span class="tab-close">×</span>
+        <div 
+          v-for="file in openedFiles" 
+          :key="file.path" 
+          class="tab" 
+          :class="{ active: currentFile && currentFile.path === file.path }"
+          @click="$emit('switch-file', file)"
+        >
+          <span class="tab-name">{{ file.name }}</span>
+          <span class="tab-close" @click.stop="$emit('close-file', file)">×</span>
         </div>
-        <div v-else class="tab active">
+        <div v-if="openedFiles.length === 0" class="tab active">
           <span class="tab-name">Untitled</span>
         </div>
         <div class="add-tab" @click="handleAddTab" title="New File">+</div>
