@@ -12,7 +12,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['update:content']);
+const emit = defineEmits(['update:content', 'create-file']);
 
 const content = ref(props.initialContent);
 const textareaRef = ref(null);
@@ -20,6 +20,10 @@ const textareaRef = ref(null);
 watch(() => props.initialContent, (newValue) => {
   content.value = newValue;
 });
+
+const handleAddTab = () => {
+  emit('create-file');
+};
 
 const lineCount = computed(() => {
   if (!content.value) return 1;
@@ -64,6 +68,7 @@ const handleTab = (event) => {
         <div v-else class="tab active">
           <span class="tab-name">Untitled</span>
         </div>
+        <div class="add-tab" @click="handleAddTab" title="New File">+</div>
       </div>
       <div class="editor-actions">
         <button class="action-button">📋</button>

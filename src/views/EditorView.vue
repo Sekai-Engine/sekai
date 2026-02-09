@@ -1,11 +1,13 @@
 <script setup>
 import { ref, onMounted, nextTick, computed } from "vue";
+import { useRouter } from 'vue-router';
 import Editor from "../components/Editor.vue";
 import PreviewPanel from "../components/PreviewPanel.vue";
 import FileManager from "../components/FileManager.vue";
 import Settings from "../components/Settings.vue";
 import { fileSystem } from '../services/FileSystem';
 
+const router = useRouter();
 const message = ref("Sekai");
 const isFileManagerVisible = ref(true);
 const isMobile = ref(false);
@@ -40,6 +42,59 @@ const handleContentUpdate = async (newContent) => {
     }
   }
 };
+
+const handleCreateFile = async () => {
+  const fileName = prompt('请输入新文件名称 (包含后缀):', 'untitled.txt');
+  if (!fileName) return;
+
+  // Ideally we need a path. 
+  // If a file is currently open, create in same dir.
+  // If not, maybe ask user or default to root?
+  // But wait, the user is in Editor, context is usually the current file's folder.
+  
+  // Let's get the base path from currentFile or route query
+  let parentPath = null;
+  
+  if (currentFile.value && currentFile.value.path) {
+     // Get parent directory of current file
+     // Windows path separator is \, but web/tauri might normalize to /
+     // Let's assume / for now as we use join()
+     const parts = currentFile.value.path.split(/[\/\\]/);
+     parts.pop();
+     parentPath = parts.join('/');
+  } else {
+     // Fallback to project root from route
+     const route = router.currentRoute.value;
+     parentPath = route.query.path;
+  }
+
+  if (!parentPath) {
+      alert("无法确定创建位置，请先在文件管理器中选择一个项目");
+      return;
+  }
+
+  try {
+    const newFilePath = await fileSystem.join(parentPath, fileName);
+    await fileSystem.writeFile(newFilePath, '');
+    
+    // Open the new file
+    // We need to construct a file object similar to what FileManager emits
+    const newFile = {
+        name: fileName,
+        path: newFilePath,
+        type: 'file'
+    };
+    await handleFileSelect(newFile);
+    
+    // Also we might want to refresh file manager, but EditorView doesn't easily control FileManager's internal state
+    // For now, the file is created and opened. FileManager needs a refresh mechanism or we just leave it be until user interacts.
+    
+  } catch (error) {
+    console.error('Failed to create file:', error);
+    alert('创建文件失败: ' + error.message);
+  }
+};
+
 
 const errors = ref([
   // Mock data for testing
@@ -163,6 +218,7 @@ onMounted(() => {
             :initial-content="fileContent"
             :current-file="currentFile"
             @update:content="handleContentUpdate"
+            @create-file="handleCreateFile"
           />
           <Editor v-else />
           

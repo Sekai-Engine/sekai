@@ -22,19 +22,6 @@ const createNewProject = async () => {
     // This provides a fixed path without prompting user every time
     let baseDir = await fileSystem.getAppInstallDir();
 
-    // Fallback for Web if getAppInstallDir (OPFS) is not desired or fails silently
-    // Or if we want to allow user to pick a folder on first time if not using OPFS
-    // But currently getAppInstallDir returns "opfs:/" on web.
-    
-    // In Web, if user hasn't selected a directory yet (and we want to support external folders too),
-    // we might need to prompt. But our current logic for Web uses OPFS by default.
-    // If the error "No project path provided" appears, it might be because baseDir is null/undefined.
-    
-    if (!baseDir) {
-       // If getting default dir fails, ask user to pick
-       baseDir = await fileSystem.selectDirectory();
-    }
-
     if (baseDir) {
       // Prompt user for project name
       const defaultName = 'New Project';
