@@ -144,7 +144,7 @@ const handleContentUpdate = async (newContent) => {
 const handleCreateFile = async () => {
   // Create a new in-memory file
   const newFile = {
-    name: 'Untitled',
+    name: 'untitled',
     path: null, // No path yet
     type: 'file',
     isUnsaved: true,
@@ -160,7 +160,7 @@ const saveCurrentFile = async () => {
 
   if (currentFile.value.isUnsaved) {
     // ... existing save logic for new file
-    const fileName = prompt('请输入保存的文件名 (包含后缀):', 'new_file.txt');
+    const fileName = prompt('请输入保存的文件名 (包含后缀):', 'untitle');
     if (!fileName) return;
 
     let parentPath = null;

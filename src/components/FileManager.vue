@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { fileSystem } from '../services/FileSystem';
+import { listen } from '@tauri-apps/api/event';
 
 const route = useRoute();
 const files = ref([]);
@@ -41,15 +42,61 @@ const closeContextMenu = () => {
 };
 
 // Close context menu on click outside
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', closeContextMenu);
+  window.addEventListener('mousemove', updateMousePosition);
+  
+  try {
+    unlistenFileDrop = await listen('tauri://drag-drop', (event) => {
+      // Check if mouse is over file manager
+      // Note: In async callback, ref value might be lost if component unmounted, but here it shouldn't be.
+      // However, if we are in a sub-component or if the ref is not bound correctly?
+      // Let's use document.elementFromPoint as a fallback or just check if paths exist.
+      // Actually, if fileManagerRef is null, it means the DOM element is not bound or component is gone.
+      // Let's check if we can get the element by ID or class if ref fails.
+      
+      const fileManagerEl = fileManagerRef.value || document.querySelector('.file-manager-container');
+      
+      if (fileManagerEl) {
+        const rect = fileManagerEl.getBoundingClientRect();
+        // Use event.payload.position if available (Tauri v2 drag-drop usually has it)
+        // Or fallback to our tracked mouse position if needed, but event.payload.position is better
+        let dropX = mouseX.value;
+        let dropY = mouseY.value;
+        
+        if (event.payload.position) {
+            // Note: payload position is usually physical screen coordinates or window coordinates?
+            // Usually client coordinates relative to window content area.
+            dropX = event.payload.position.x;
+            dropY = event.payload.position.y;
+        }
+
+        const isOver = dropX >= rect.left && 
+                       dropX <= rect.right && 
+                       dropY >= rect.top && 
+                       dropY <= rect.bottom;
+        if (isOver) {
+            const paths = event.payload.paths; // In v2 drag-drop, paths is inside payload object
+            if (paths && paths.length > 0) {
+              processDroppedPaths(paths);
+            }
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to setup tauri file drop listener', e);
+  }
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', closeContextMenu);
+  window.removeEventListener('mousemove', updateMousePosition);
   if (unwatch) {
     unwatch();
     unwatch = null;
+  }
+  if (unlistenFileDrop) {
+    unlistenFileDrop();
   }
 });
 
@@ -209,7 +256,7 @@ const createFile = async () => {
     
   if (!parentPath) return;
 
-  const fileName = prompt('请输入文件名称 (包含后缀):', 'new_file.txt');
+  const fileName = prompt('请输入文件名称 (包含后缀):', 'untitled.txt');
   if (!fileName) return;
 
   try {
@@ -260,6 +307,75 @@ const toggleFolder = async (folder) => {
     await loadFolderChildren(folder);
   }
   folder.expanded = !folder.expanded;
+};
+
+const fileManagerRef = ref(null);
+const mouseX = ref(0);
+const mouseY = ref(0);
+let unlistenFileDrop = null;
+
+const updateMousePosition = (e) => {
+  mouseX.value = e.clientX;
+  mouseY.value = e.clientY;
+};
+
+const handleDragEnter = (e) => {
+  e.preventDefault();
+};
+
+const handleDragLeave = (e) => {
+  e.preventDefault();
+};
+
+const handleDragOver = (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+};
+
+const processDroppedPaths = async (paths) => {
+  let targetDir = route.query.path;
+  
+  if (selectedFile.value) {
+      if (selectedFile.value.type === 'folder') {
+          targetDir = selectedFile.value.path;
+      } else {
+           const parts = selectedFile.value.path.split(/[/\\]/);
+           parts.pop();
+           targetDir = parts.join('/');
+      }
+  }
+  
+  if (!targetDir) targetDir = route.query.path;
+
+  for (const sourcePath of paths) {
+    try {
+        // Extract filename from path
+        const fileName = sourcePath.split(/[/\\]/).pop();
+        const destPath = await fileSystem.join(targetDir, fileName);
+        
+        await fileSystem.copyFile(sourcePath, destPath);
+    } catch (err) {
+        console.error('Copy failed', err);
+        alert(`导入失败 ${sourcePath}: ${err.message}`);
+    }
+  }
+  
+  if (selectedFile.value?.type === 'folder' && selectedFile.value.path === targetDir) {
+      await loadFolderChildren(selectedFile.value);
+  } else {
+      await loadProjectFiles();
+  }
+};
+
+const handleDrop = async (e) => {
+  e.preventDefault();
+  
+  // Delay reset to allow tauri://file-drop to see the active state
+  // Tauri event typically fires after the native drop event
+  setTimeout(() => {
+    dragCounter = 0;
+    isDragOver.value = false;
+  }, 100);
 };
 
 const emit = defineEmits(['select-file', 'file-deleted']);
@@ -322,7 +438,13 @@ const getFileColor = (file) => {
 </script>
 
 <template>
-  <div class="file-manager-container">
+  <div 
+    class="file-manager-container"
+    @dragenter="handleDragEnter"
+    @dragleave="handleDragLeave"
+    @dragover="handleDragOver" 
+    @drop="handleDrop"
+  >
     <div class="file-manager-body" @contextmenu.prevent="handleContextMenu($event, null)">
       <div class="file-tree">
         <div 

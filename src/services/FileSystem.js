@@ -50,6 +50,10 @@ class TauriFileSystem {
     }
   }
 
+  async copyFile(source, destination) {
+    return await fs.copyFile(source, destination);
+  }
+
   async writeFile(filePath, content) {
     return await fs.writeTextFile(filePath, content);
   }
