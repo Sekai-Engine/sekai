@@ -65,7 +65,32 @@ const deleteFile = async () => {
   try {
     await fileSystem.remove(file.path);
     emit('file-deleted', file);
-    // Refresh will happen via watcher
+    
+    // Refresh folder view if deleted file was in a folder
+    // We can iterate files to find parent folder and reload its children
+    const findParentFolder = (items) => {
+      for (const item of items) {
+        if (item.type === 'folder' && item.children) {
+           const found = item.children.find(c => c.path === file.path);
+           if (found) return item;
+           const deepFound = findParentFolder(item.children);
+           if (deepFound) return deepFound;
+        }
+      }
+      return null;
+    };
+    
+    const parentFolder = findParentFolder(files.value);
+    if (parentFolder) {
+      await loadFolderChildren(parentFolder);
+    } else {
+      // If it's a root file, the watcher should handle it, but we can force reload too if needed
+      // But watcher might be slow or not triggered if we don't have watcher on root properly set up for deep?
+      // Our watcher is only on root projectPath. 
+      // If we deleted a file in subfolder, root watcher might not detect it if it's not recursive or if implementation details vary.
+      // But typically we rely on watcher. However, for immediate feedback on subfolders (which are loaded manually on expand),
+      // we need to reload the parent folder manually as we did above.
+    }
   } catch (error) {
     console.error('Failed to delete file:', error);
     alert('删除失败: ' + error.message);
@@ -211,13 +236,16 @@ const loadFolderChildren = async (folder) => {
   
   try {
     const entries = await fileSystem.readDir(folder.path);
-    folder.children = entries.map(entry => ({
+    
+    const childrenWithPaths = await Promise.all(entries.map(async entry => ({
       name: entry.name,
       type: entry.isDirectory ? 'folder' : 'file',
-      path: fileSystem.join(folder.path, entry.name),
+      path: await fileSystem.join(folder.path, entry.name),
       expanded: false,
       children: []
-    })).sort((a, b) => {
+    })));
+
+    folder.children = childrenWithPaths.sort((a, b) => {
       if (a.type === b.type) return a.name.localeCompare(b.name);
       return a.type === 'folder' ? -1 : 1;
     });

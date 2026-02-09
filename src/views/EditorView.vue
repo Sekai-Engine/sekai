@@ -7,6 +7,10 @@ import FileManager from "../components/FileManager.vue";
 import Settings from "../components/Settings.vue";
 import { fileSystem } from '../services/FileSystem';
 
+const normalizePath = (path) => {
+  return path ? path.replace(/\\/g, '/') : '';
+};
+
 const router = useRouter();
 const message = ref("Sekai");
 const isFileManagerVisible = ref(true);
@@ -24,7 +28,7 @@ const openedFiles = ref([]); // Manage list of opened files
 
 const handleFileSelect = async (file) => {
   // Check if file is already opened
-  const existingFile = openedFiles.value.find(f => f.path === file.path);
+  const existingFile = openedFiles.value.find(f => normalizePath(f.path) === normalizePath(file.path));
   if (!existingFile) {
     openedFiles.value.push(file);
   } else {
@@ -83,7 +87,7 @@ const handleSwitchFile = async (file) => {
      currentFile.value.content = fileContent.value;
   }
   
-  if (currentFile.value && currentFile.value.path === file.path) return;
+  if (currentFile.value && normalizePath(currentFile.value.path) === normalizePath(file.path)) return;
   await handleFileSelect(file);
 };
 
@@ -107,7 +111,7 @@ const handleCloseFile = (file) => {
 };
 
 const handleFileDeleted = (deletedFile) => {
-  const file = openedFiles.value.find(f => f.path === deletedFile.path);
+  const file = openedFiles.value.find(f => normalizePath(f.path) === normalizePath(deletedFile.path));
   if (file) {
     file.isDirty = true;
   }
