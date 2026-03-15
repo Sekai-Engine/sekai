@@ -1,14 +1,22 @@
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "opener:default",
-    "fs:default",
-    "fs:allow-resource-read-recursive",
-    "fs:allow-resource-write-recursive",
-    "dialog:default"
-  ]
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "default",
+	"description": "Capability for the main window",
+	"windows": ["main"],
+	"permissions": [
+		"core:path:default",
+		"dialog:allow-open",
+		"dialog:allow-confirm", 
+		"fs:allow-mkdir",
+		"fs:allow-write-text-file",
+		"fs:allow-exists",
+		"fs:allow-read-dir",
+		"fs:allow-remove",
+		"fs:allow-copy-file",
+		"fs:allow-stat",
+		{
+			"identifier": "fs:scope",
+			"allow": [{ "path": "$HOME/**" }]
+		}
+	]
 }

@@ -320,7 +320,7 @@ onMounted(() => {
     <header class="app-header">
       <div class="header-left">
         <div class="logo">
-          <img src="../assets/icon.png" alt="Sekai" class="logo-icon" />
+          <img src="/icon.png" alt="Sekai" class="logo-icon" />
           <h1>{{ message }}</h1>
         </div>
       </div>

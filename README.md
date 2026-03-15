@@ -2,13 +2,17 @@
 
 <div align="center" style="display:grid;place-items:center;">
 	<p>
-	    <a href="https://github.com/Sekai-Engine/sekai" target="_blank"><img width="180" src="./src/assets/icon.png" alt="sekai logo"></a>
+	    <a href="https://github.com/Sekai-Engine/sekai" target="_blank"><img width="180" src="./public/icon.png" alt="sekai logo"></a>
         <h1>Sekai</h1>
     <p>
     <img src="https://img.shields.io/badge/License-MIT--License-blue.svg?style=flat-square&logo=opensourceinitiative&logoSize=14" alt="License" height="20">
     <img src="https://img.shields.io/badge/godot-4.0+-blue.svg" alt="License" height="20">
 	<img src="https://img.shields.io/github/stars/Sekai-Engine/sekai?style=flat-square&logo=github&color=green&logoSize=14" alt="License" height="20">
+	<p>
+	
 </div>
+
+English|[中文](./README_CN.md)
 
 Sekai Engine is a modern visual novel game engine, with its core developed based on Godot Mono. It focuses on providing an efficient and flexible development experience for visual novel games.
 

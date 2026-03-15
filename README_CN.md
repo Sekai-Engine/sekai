@@ -2,13 +2,15 @@
 
 <div align="center" style="display:grid;place-items:center;">
 	<p>
-	    <a href="https://atomgit.com/Sekai-Engine/sekai" target="_blank"><img width="180" src="./src/assets/icon.png" alt="sekai logo"></a>
+	    <a href="https://atomgit.com/Sekai-Engine/sekai" target="_blank"><img width="180" src="./public/icon.png" alt="sekai logo"></a>
         <h1>Sekai</h1>
     <p>
     <img src="https://img.shields.io/badge/License-MIT--License-blue.svg?style=flat-square&logo=opensourceinitiative&logoSize=14" alt="License" height="20">
     <img src="https://img.shields.io/badge/godot-4.0+-blue.svg" alt="License" height="20">
 	<img src="https://img.shields.io/github/stars/Sekai-Engine/sekai?style=flat-square&logo=github&color=green&logoSize=14" alt="License" height="20">
 </div>
+
+[English](./README.md)|中文
 
 Sekai 引擎是现代化文字冒险游戏引擎，内核基于 Godot Mono 开发，专注于提供高效、灵活的文字冒险游戏开发体验。
 
@@ -68,4 +70,5 @@ windows环境下运行：
 - sekai基于[Godot Engine](https://godotengine.org/)开发 - 强大的开源游戏引擎.
 - 感谢[100font](https://www.100font.com/)提供字体资源.
 - sekai引擎引用[ezgal开发模板](https://github.com/GodotHub/ezgal).
+- sekai引擎打包[]
 - 感谢所有贡献者和社区成员.
