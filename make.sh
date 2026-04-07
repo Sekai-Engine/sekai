@@ -15,17 +15,12 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-# 检查 wget
-if ! command -v wget &> /dev/null; then
-    echo "❌ 未找到 wget。请安装 wget。"
-    exit 1
-fi
-
 echo "✅ 所有依赖已就绪。"
 
 npm install
 npm run tauri build || true
-mv ./src-tauri/target/release/sekai .
+mkdir -p bin
+mv ./src-tauri/target/release/sekai ./bin/
 
 echo "构建结束"
 

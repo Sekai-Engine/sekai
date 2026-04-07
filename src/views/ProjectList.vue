@@ -2,6 +2,7 @@
 	import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { fileSystem } from '../services/FileSystem';
+import { invoke } from '@tauri-apps/api/core';
 
 const router = useRouter();
 
@@ -44,7 +45,7 @@ const createNewProject = async () => {
       return;
     }
     await fileSystem.createDirectory(projectPath);
-    
+
     const dirExists = await fileSystem.exists(projectPath);
     if (!dirExists) {
       alert('主目录创建失败');
@@ -58,22 +59,24 @@ const createNewProject = async () => {
     console.log('[6] 创建子目录完成');
 
     // Step 5: 创建.init文件
-    const config = {
-      name: projectName,
-      version: '0.0.1',
-      created: new Date().toISOString(),
+    const projectConfig = {
+	main: {
+    theme: {
       description: 'New Sekai Project'
+    }
+  }
     };
-    const initFilePath = await fileSystem.join(projectPath, 'script', 'init.json');
-await fileSystem.writeFile(initFilePath, JSON.stringify(config, null, 2));
-    const fileExists = await fileSystem.exists(initFilePath);
+    const projectFilePath = await fileSystem.join(projectPath, 'sekai.project');
+    await fileSystem.writeFile(projectFilePath, JSON.stringify(projectConfig, null, 4));
+    const fileExists = await fileSystem.exists(projectFilePath);
+
 
     // 添加到项目列表
     projects.value.unshift({
       id: Date.now(),
       name: projectName,
       path: projectPath,
-      description: config.description,
+      description: projectConfig.main.theme.description,
       image: '/placeholder-game.jpg',
       lastModified: new Date().toLocaleDateString()
     });
@@ -86,7 +89,13 @@ await fileSystem.writeFile(initFilePath, JSON.stringify(config, null, 2));
   }
 };
 
-const openProject = (project) => {
+const openProject = async (project) => {
+  try {
+    await invoke('set_project_path', {path: project.path});
+  } catch (error) {
+    console.error('设置项目路径失败');
+  }
+
   router.push({
     path: '/editor',
     query: { path: project.path, name: project.name }
