@@ -13,6 +13,7 @@ pub fn main() {
             command::run_command,
             command::set_project_path,
             binary::download_binary,
+            binary::check_binary_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

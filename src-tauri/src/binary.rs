@@ -5,7 +5,7 @@ use std::io::Write;
 pub struct BinaryConfig {
     pub key: &'static str,
     pub win_name: &'static str,
-    pub unix_name: &'static str,
+    pub linux_name: &'static str,
     pub url: &'static str,
 }
 
@@ -13,33 +13,29 @@ pub static BINARY_CONFIG: [BinaryConfig; 2] = [
     BinaryConfig {
         key: "template",
         win_name: "sekai.exe",
-        unix_name: "sekai.x86_64",
-        unix_url: "https://{}/Sekai-Engine/sekai-template/raw/master/src/{}",
+        linux_name: "sekai.x86_64",
+        url: "https://{}/Sekai-Engine/sekai-template/raw/master/src/{}",
     },
     BinaryConfig {
         key: "pack",
         win_name: "sekaipack.exe",
-        unix_name: "sekaipack",
-        unix_url: "https://{}/Sekai-Engine/sekai-pack/raw/master/src/sekai{}",
+        linux_name: "sekaipack",
+        url: "https://{}/Sekai-Engine/sekai-pack/raw/master/src/sekai{}",
     },
 ];
 
 #[tauri::command]
-pub fn download_binary(key: &str) -> Result<String, String> {
+pub fn download_binary(key: &str, source: &str, os_type: &str) -> Result<String, String> {
     let config = BINARY_CONFIG
         .iter()
         .find(|c| c.key == key)
         .ok_or_else(|| format!("未知的二进制文件标识: {}", key))?;
 
-    let filename = if cfg!(target_os = "windows") {
-        config.win_name
-    } else {
-        config.unix_name
+    let (filename, url) = match os_type {
+        "windows" => (config.win_name, config.url_template.replace("{}", source).replace("{}", config.win_name)),
+        "linux" => (config.linux_name, config.url_template.replace("{}", source).replace("{}", config.linux_name)),
+        _ => return Err(format!("不支持的系统类型: {}", os_type)),
     };
-
-    let url = config.url_template
-        .replace("{}", source)
-        .replace("{}", filename);
 
     let exe_path = env::current_exe().map_err(|e| e.to_string())?;
     let exe_dir = exe_path
@@ -78,4 +74,31 @@ pub fn download_binary(key: &str) -> Result<String, String> {
 
     Ok(format!("下载成功: {}", filename))
 }
+
+#[tauri::command]
+pub fn check_binary_exists(key: &str) -> Result<String, String> {
+    let config = BINARY_CONFIG
+        .iter()
+        .find(|c| c.key == key)
+        .ok_or_else(|| format!("未知的二进制文件标识: {}", key))?;
+    let os_type = if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "linux"
+    };
+    let filename = match os_type {
+        "windows" => config.win_name,
+        "linux" => config.linux_name,
+        _ => return Err(format!("不支持的系统类型: {}", os_type)),
+    };
+    let exe_path = env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = exe_path.parent().ok_or_else(|| "无法获取程序目录".to_string())?;
+    let file_path = exe_dir.join("module").join(filename);
+    if file_path.exists() {
+        Ok("exists".to_string())
+    } else {
+        Ok(os_type.to_string())
+    }
+}
+
 

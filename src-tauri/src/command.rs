@@ -51,7 +51,7 @@ pub fn start(project_path: &str) -> (String, Vec<String>) {
             if cfg!(target_os = "windows") {
                 c.win_name
             } else {
-                c.unix_name
+                c.linux_name
             }
         })
         .unwrap();
@@ -59,3 +59,5 @@ pub fn start(project_path: &str) -> (String, Vec<String>) {
     let args = vec!["--path".to_string(), project_path.to_string()];
     (cmd, args)
 }
+
+

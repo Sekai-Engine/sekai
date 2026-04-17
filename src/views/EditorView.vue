@@ -11,7 +11,9 @@ import { invoke } from '@tauri-apps/api/core';
 const normalizePath = (path) => {
   return path ? path.replace(/\\/g, '/') : '';
 };
-
+import DownloadModal from "../components/DownloadModal.vue";
+const showDownloadModal = ref(false);
+const downloadOsType = ref("linux");
 const router = useRouter();
 const message = ref("Sekai");
 const isFileManagerVisible = ref(true);
@@ -237,11 +239,18 @@ const toggleErrorPanel = () => {
 };
 
 const handleRun = async () => {
-try {
-	await invoke('run_command',{command: 'start'} );
-    } catch (error) {
-	console.error('命令执行失败:', error);
+  try {
+    const result = await invoke("check_binary_exists", { key: "template" });
+
+    if (result !== "exists") {
+      downloadOsType.value = result;
+      showDownloadModal.value = true;
+      return;
     }
+    await invoke("run_command", { command: "start" });
+  } catch (error) {
+    console.error("命令执行失败:", error);
+  }
 };
 
 const handleDebug = () => {
@@ -444,6 +453,15 @@ onMounted(() => {
 		</main>
 	</div>
 </template>
+
+<DownloadModal
+  :visible="showDownloadModal"
+  :binary-key="'template'"
+  :binary-name="'Sekai Engine'"
+  :os-type="downloadOsType"
+  @close="showDownloadModal = false"
+  @success="onDownloadSuccess"
+/>
 
 <style>
 * {
