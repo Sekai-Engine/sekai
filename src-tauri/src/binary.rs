@@ -32,8 +32,8 @@ pub fn download_binary(key: &str, source: &str, os_type: &str) -> Result<String,
         .ok_or_else(|| format!("未知的二进制文件标识: {}", key))?;
 
     let (filename, url) = match os_type {
-        "windows" => (config.win_name, config.url_template.replace("{}", source).replace("{}", config.win_name)),
-        "linux" => (config.linux_name, config.url_template.replace("{}", source).replace("{}", config.linux_name)),
+        "windows" => (config.win_name, config.url.replace("{}", source).replace("{}", config.win_name)),
+        "linux" => (config.linux_name, config.url.replace("{}", source).replace("{}", config.linux_name)),
         _ => return Err(format!("不支持的系统类型: {}", os_type)),
     };
 
